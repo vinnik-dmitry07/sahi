@@ -129,18 +129,18 @@ class Yolov8DetectionModel(DetectionModel):
                 category_id = int(prediction[5])
                 category_name = self.category_mapping[str(category_id)]
 
-                # fix negative box coords
-                bbox[0] = max(0, bbox[0])
-                bbox[1] = max(0, bbox[1])
-                bbox[2] = max(0, bbox[2])
-                bbox[3] = max(0, bbox[3])
-
-                # fix out of image box coords
-                if full_shape is not None:
-                    bbox[0] = min(full_shape[1], bbox[0])
-                    bbox[1] = min(full_shape[0], bbox[1])
-                    bbox[2] = min(full_shape[1], bbox[2])
-                    bbox[3] = min(full_shape[0], bbox[3])
+                # # fix negative box coords
+                # bbox[0] = max(0, bbox[0])
+                # bbox[1] = max(0, bbox[1])
+                # bbox[2] = max(0, bbox[2])
+                # bbox[3] = max(0, bbox[3])
+                #
+                # # fix out of image box coords
+                # if full_shape is not None:
+                #     bbox[0] = min(full_shape[1], bbox[0])
+                #     bbox[1] = min(full_shape[0], bbox[1])
+                #     bbox[2] = min(full_shape[1], bbox[2])
+                #     bbox[3] = min(full_shape[0], bbox[3])
 
                 # ignore invalid predictions
                 if not (bbox[0] < bbox[2]) or not (bbox[1] < bbox[3]):

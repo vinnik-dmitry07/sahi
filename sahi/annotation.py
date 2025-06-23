@@ -36,8 +36,8 @@ class BoundingBox:
                 To shift the box and mask predictions from sliced image
                 to full sized image, should be in the form of [shift_x, shift_y]
         """
-        if box[0] < 0 or box[1] < 0 or box[2] < 0 or box[3] < 0:
-            raise Exception("Box coords [minx, miny, maxx, maxy] cannot be negative")
+        # if box[0] < 0 or box[1] < 0 or box[2] < 0 or box[3] < 0:
+        #     raise Exception("Box coords [minx, miny, maxx, maxy] cannot be negative")
         self.minx = box[0]
         self.miny = box[1]
         self.maxx = box[2]
@@ -586,16 +586,16 @@ class ObjectAnnotation:
         if type(bbox).__module__ == "numpy":
             bbox = copy.deepcopy(bbox).tolist()
 
-        # make sure bbox coords lie inside [0, image_size]
-        xmin = max(bbox[0], 0)
-        ymin = max(bbox[1], 0)
-        if full_shape:
-            xmax = min(bbox[2], full_shape[1])
-            ymax = min(bbox[3], full_shape[0])
-        else:
-            xmax = bbox[2]
-            ymax = bbox[3]
-        bbox = [xmin, ymin, xmax, ymax]
+        # # make sure bbox coords lie inside [0, image_size]
+        # xmin = max(bbox[0], 0)
+        # ymin = max(bbox[1], 0)
+        # if full_shape:
+        #     xmax = min(bbox[2], full_shape[1])
+        #     ymax = min(bbox[3], full_shape[0])
+        # else:
+        #     xmax = bbox[2]
+        #     ymax = bbox[3]
+        # bbox = [xmin, ymin, xmax, ymax]
         # set bbox
         self.bbox = BoundingBox(bbox, shift_amount)
 
