@@ -229,12 +229,12 @@ class UltralyticsDetectionModel(DetectionModel):
                 category_name = self.category_mapping[str(category_id)]
 
                 # Fix box coordinates
-                bbox = [max(0, coord) for coord in bbox]
-                if full_shape is not None:
-                    bbox[0] = min(full_shape[1], bbox[0])
-                    bbox[1] = min(full_shape[0], bbox[1])
-                    bbox[2] = min(full_shape[1], bbox[2])
-                    bbox[3] = min(full_shape[0], bbox[3])
+                # bbox = [max(0, coord) for coord in bbox]
+                # if full_shape is not None:
+                #     bbox[0] = min(full_shape[1], bbox[0])
+                #     bbox[1] = min(full_shape[0], bbox[1])
+                #     bbox[2] = min(full_shape[1], bbox[2])
+                #     bbox[3] = min(full_shape[0], bbox[3])
 
                 # Ignore invalid predictions
                 if not (bbox[0] < bbox[2]) or not (bbox[1] < bbox[3]):

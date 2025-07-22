@@ -45,7 +45,7 @@ class BoundingBox:
     shift_amount: Tuple[int, int] = (0, 0)
 
     def __post_init__(self):
-        if len(self.box) != 4 or any(coord < 0 for coord in self.box):
+        if len(self.box) != 4:  # or any(coord < 0 for coord in self.box):
             raise ValueError("box must be 4 non-negative floats: [minx, miny, maxx, maxy]")
         if len(self.shift_amount) != 2:
             raise ValueError("shift_amount must be 2 integers: [shift_x, shift_y]")
@@ -99,9 +99,9 @@ class BoundingBox:
         y_mar = int(w * ratio)
         x_mar = int(h * ratio)
         maxx = min(max_x, self.maxx + x_mar) if max_x else self.maxx + x_mar
-        minx = max(0, self.minx - x_mar)
+        minx = self.minx - x_mar
         maxy = min(max_y, self.maxy + y_mar) if max_y else self.maxy + y_mar
-        miny = max(0, self.miny - y_mar)
+        miny = self.miny - y_mar
         box = [minx, miny, maxx, maxy]
         return BoundingBox(box)
 
@@ -560,15 +560,15 @@ class ObjectAnnotation:
             bbox = copy.deepcopy(bbox).tolist()
 
         # make sure bbox coords lie inside [0, image_size]
-        xmin = max(bbox[0], 0)
-        ymin = max(bbox[1], 0)
-        if full_shape:
-            xmax = min(bbox[2], full_shape[1])
-            ymax = min(bbox[3], full_shape[0])
-        else:
-            xmax = bbox[2]
-            ymax = bbox[3]
-        bbox = [xmin, ymin, xmax, ymax]
+        # xmin = max(bbox[0], 0)
+        # ymin = max(bbox[1], 0)
+        # if full_shape:
+        #     xmax = min(bbox[2], full_shape[1])
+        #     ymax = min(bbox[3], full_shape[0])
+        # else:
+        #     xmax = bbox[2]
+        #     ymax = bbox[3]
+        # bbox = [xmin, ymin, xmax, ymax]
         # set bbox
         self.bbox = BoundingBox(bbox, shift_amount)
 

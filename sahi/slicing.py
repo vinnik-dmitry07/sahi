@@ -110,16 +110,35 @@ def annotation_inside_slice(annotation: Dict, slice_bbox: List[int]) -> bool:
     right = left + width
     bottom = top + height
 
-    if left >= slice_bbox[2]:
-        return False
-    if top >= slice_bbox[3]:
-        return False
-    if right <= slice_bbox[0]:
-        return False
-    if bottom <= slice_bbox[1]:
+    # Unpack slice bbox
+    slice_xmin, slice_ymin, slice_xmax, slice_ymax = slice_bbox
+
+    # Compute center of annotation
+    center_x = left + width / 2.0
+    center_y = top + height / 2.0
+
+    # Helper to check if a point (x, y) is inside the slice (inclusive)
+    def point_inside(x: float, y: float) -> bool:
+        return (slice_xmin <= x <= slice_xmax) and (slice_ymin <= y <= slice_ymax)
+
+    # Check center
+    if not point_inside(center_x, center_y):
         return False
 
-    return True
+    # Define the four corners of annotation
+    corners = [
+        (left, top),      # top-left
+        (right, top),     # top-right
+        (left, bottom),   # bottom-left
+        (right, bottom)   # bottom-right
+    ]
+
+    # Check if at least one corner is inside
+    for (cx, cy) in corners:
+        if point_inside(cx, cy):
+            return True
+
+    return False
 
 
 def process_coco_annotations(
@@ -139,13 +158,46 @@ def process_coco_annotations(
     Returns:
         (List[CocoAnnotation]): Sliced annotations.
     """
+    from sahi.utils.shapely import ShapelyAnnotation, box
+    from shapely.geometry import MultiPolygon
 
     sliced_coco_annotation_list: List[CocoAnnotation] = []
     for coco_annotation in coco_annotation_list:
         if annotation_inside_slice(coco_annotation.json, slice_bbox):
+            minx, miny, maxx, maxy = slice_bbox
+            width = maxx - minx
+            height = maxy - miny
+            coco_bbox = [minx, miny, width, height]
+            coco_annotation = CocoAnnotation.from_shapely_annotation(
+                ShapelyAnnotation(coco_annotation._shapely_annotation.multipolygon, slice_bbox),
+                category_id=coco_annotation.category_id,
+                category_name=coco_annotation.category_name,
+                iscrowd=coco_annotation.iscrowd,
+            )
             sliced_coco_annotation = coco_annotation.get_sliced_coco_annotation(slice_bbox)
-            if sliced_coco_annotation.area / coco_annotation.area >= min_area_ratio:
-                sliced_coco_annotation_list.append(sliced_coco_annotation)
+            w, h = coco_annotation.bbox[2:4]
+            ratio = max(w, h) / min(w, h)
+            if 1 <= ratio < 1.05:
+                # assume 0 overlap 10 percent should be enough to produce two full boxes
+                # 1-4x full
+                if sliced_coco_annotation.area / coco_annotation.area >= 0.1:
+                    sliced_coco_annotation_list.append(coco_annotation)
+            elif 1.05 <= ratio < 2.3:
+                # 1-4x full rest is sliced
+                if sliced_coco_annotation.area / coco_annotation.area >= 0.35:
+                    sliced_coco_annotation_list.append(coco_annotation)
+                elif sliced_coco_annotation.area / coco_annotation.area >= 0.1:
+                    sliced_coco_annotation_list.append(sliced_coco_annotation)
+            else:
+                # 4x sliced
+                w1, h1 = sliced_coco_annotation.bbox[2:4]
+                if w > h:
+                    inside = w1 / width
+                else:
+                    inside = h1 / height
+                # we cannot produce full boxes with this ratio, we should filter anns which will be covered by overlap of other slice, inside > or >> overlap
+                if inside > 0.2:
+                    sliced_coco_annotation_list.append(sliced_coco_annotation)
     return sliced_coco_annotation_list
 
 
