@@ -17,6 +17,8 @@ from sahi.utils.coco import Coco, CocoAnnotation, CocoImage, create_coco_dict
 from sahi.utils.cv import IMAGE_EXTENSIONS_LOSSLESS, IMAGE_EXTENSIONS_LOSSY, read_image_as_pil
 from sahi.utils.file import load_json, save_json
 
+import cv2
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
@@ -368,11 +370,9 @@ def slice_image(
     verboselog = logger.info if verbose else lambda *a, **k: None
 
     def _export_single_slice(image: np.ndarray, output_dir: str, slice_file_name: str):
-        image_pil = read_image_as_pil(image)
         slice_file_path = str(Path(output_dir) / slice_file_name)
         # export sliced image
-        image_pil.save(slice_file_path)
-        image_pil.close()  # to fix https://github.com/obss/sahi/issues/565
+        cv2.imwrite(slice_file_path, image)
         verboselog("sliced image path: " + slice_file_path)
 
     # create outdir if not present
@@ -380,12 +380,12 @@ def slice_image(
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     # read image
-    image_pil = read_image_as_pil(image)
-    verboselog("image.shape: " + str(image_pil.size))
+    image_cv2 = cv2.imread(image)
+    verboselog("image.shape: " + str(image_cv2.shape))
 
-    image_width, image_height = image_pil.size
+    image_height, image_width = image_cv2.shape[:-1]
     if not (image_width != 0 and image_height != 0):
-        raise RuntimeError(f"invalid image size: {image_pil.size} for 'slice_image'.")
+        raise RuntimeError(f"invalid image size: {image_cv2.shape} for 'slice_image'.")
     slice_bboxes = get_slice_bboxes(
         image_height=image_height,
         image_width=image_width,
@@ -401,7 +401,6 @@ def slice_image(
     # init images and annotations lists
     sliced_image_result = SliceImageResult(original_image_size=[image_height, image_width], image_dir=output_dir)
 
-    image_pil_arr = np.asarray(image_pil)
     # iterate over slices
     for slice_bbox in slice_bboxes:
         n_ims += 1
@@ -411,20 +410,18 @@ def slice_image(
         tly = slice_bbox[1]
         brx = slice_bbox[2]
         bry = slice_bbox[3]
-        image_pil_slice = image_pil_arr[tly:bry, tlx:brx]
+        image_cv2_slice = image_cv2[tly:bry, tlx:brx]
 
         # set image file suffixes
-        slice_suffixes = "_".join(map(str, slice_bbox))
+        slice_suffixes = '_'.join(map(str, slice_bbox))
         if out_ext:
             suffix = out_ext
-        elif hasattr(image_pil, "filename"):
-            suffix = Path(getattr(image_pil, "filename")).suffix
+        elif Path(image).suffix:
+            suffix = Path(image).suffix
             if suffix in IMAGE_EXTENSIONS_LOSSY:
-                suffix = ".png"
-            elif suffix in IMAGE_EXTENSIONS_LOSSLESS:
-                suffix = Path(image_pil.filename).suffix
+                suffix = '.png'
         else:
-            suffix = ".png"
+            suffix = '.png'
 
         # set image file name and path
         slice_file_name = f"{output_file_name}_{slice_suffixes}{suffix}"
@@ -441,7 +438,7 @@ def slice_image(
 
         # create sliced image and append to sliced_image_result
         sliced_image = SlicedImage(
-            image=image_pil_slice, coco_image=coco_image, starting_pixel=[slice_bbox[0], slice_bbox[1]]
+            image=image_cv2_slice, coco_image=coco_image, starting_pixel=[slice_bbox[0], slice_bbox[1]]
         )
         sliced_image_result.add_sliced_image(sliced_image)
 
