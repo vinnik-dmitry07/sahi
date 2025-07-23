@@ -210,7 +210,9 @@ def read_image_as_pil(image: Union[Image.Image, str, np.ndarray], exif_fix: bool
         try:
             image_pil = Image.open(
                 requests.get(image, stream=True).raw if str(image).startswith("http") else image  # type: ignore
-            ).convert("RGB")
+            )
+            if image_pil.mode != 'RGB':
+                image_pil = image_pil.convert('RGB')
             if exif_fix:
                 image_pil = exif_transpose(image_pil)
         except Exception as e:  # handle large/tiff image reading
