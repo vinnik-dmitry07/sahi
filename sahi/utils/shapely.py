@@ -2,9 +2,10 @@
 # Code written by Fatih C Akyon, 2020.
 
 from typing import List, Optional, Union
+from math import fabs
 
 import shapely
-from shapely.geometry import CAP_STYLE, JOIN_STYLE, GeometryCollection, MultiPolygon, Polygon, box
+from shapely.geometry import CAP_STYLE, JOIN_STYLE, GeometryCollection, MultiPolygon, Polygon, box, LinearRing
 from shapely.validation import make_valid
 
 
@@ -103,7 +104,7 @@ class ShapelyAnnotation:
             to calculate sliced coco coordinates.
         """
         shapely_polygon = get_shapely_box(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
-        shapely_multipolygon = MultiPolygon([(shapely_polygon,)])
+        shapely_multipolygon = shapely.multipolygons([Polygon(LinearRing(shapely_polygon))])
         return cls(multipolygon=shapely_multipolygon, slice_bbox=slice_bbox)
 
     def __init__(self, multipolygon: MultiPolygon, slice_bbox=None):
@@ -221,16 +222,34 @@ class ShapelyAnnotation:
         """
         [xmin, ymin, width, height]
         """
-        if self.multipolygon.is_valid and not self.multipolygon.is_empty:
-            coco_bbox, _ = get_bbox_from_shapely(self.multipolygon)
-            # fix coord by slice box
-            if self.slice_bbox:
-                minx = self.slice_bbox[0]
-                miny = self.slice_bbox[1]
-                coco_bbox[0] = coco_bbox[0] - minx
-                coco_bbox[1] = coco_bbox[1] - miny
+        coords = shapely.get_coordinates(self.multipolygon)
+        if len(coords) == 5:
+            (x0, y0), (x1, y1), (x2, y2), (x3, y3) = coords[:4]
+            twice_area = (
+                x0 * y1 + x1 * y2 + x2 * y3 + x3 * y0
+                - y0 * x1 - y1 * x2 - y2 * x3 - y3 * x0
+            )
+            if fabs(twice_area) <= 1e-12:
+                raise ValueError(coords)
+                # return []
+            minx, miny, maxx, maxy = *coords.min(0), *coords.max(0)
+            
         else:
-            coco_bbox: List = []
+            if not self.multipolygon.is_valid or self.multipolygon.is_empty:
+                raise ValueError(coords)
+                # return []
+            minx, miny, maxx, maxy = shapely_object.bounds
+            
+        width = maxx - minx
+        height = maxy - miny
+        coco_bbox = [minx, miny, width, height]
+        
+        # fix coord by slice box
+        if self.slice_bbox:
+            minx = self.slice_bbox[0]
+            miny = self.slice_bbox[1]
+            coco_bbox[0] = coco_bbox[0] - minx
+            coco_bbox[1] = coco_bbox[1] - miny
         return coco_bbox
 
     def to_coco_bbox(self):
