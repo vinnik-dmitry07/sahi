@@ -406,10 +406,7 @@ def slice_image(
         n_ims += 1
 
         # extract image
-        tlx = slice_bbox[0]
-        tly = slice_bbox[1]
-        brx = slice_bbox[2]
-        bry = slice_bbox[3]
+        tlx, tly, brx, bry = slice_bbox
         image_cv2_slice = image_cv2[tly:bry, tlx:brx]
 
         # set image file suffixes
@@ -513,14 +510,14 @@ def slice_coco(
     # init sliced coco_utils.CocoImage list
     sliced_coco_images: List = []
 
-    # iterate over images and slice
-    for idx, coco_image in enumerate(tqdm(coco.images)):
-        # get image path
-        image_path: str = os.path.join(image_dir, coco_image.file_name)
-        # get annotation json list corresponding to selected coco image
-        # slice image
-        try:
-            slice_image_result = slice_image(
+    pbar = tqdm(total=len(coco.images))
+    with concurrent.futures.ThreadPoolExecutor(8) as executor:
+        future_to_imgpath = {}
+        for idx, coco_image in enumerate(coco.images):
+            image_path = os.path.join(image_dir, coco_image.file_name)
+
+            future = executor.submit(
+                slice_image,
                 image=image_path,
                 coco_annotation_list=coco_image.annotations,
                 output_file_name=f"{Path(coco_image.file_name).stem}_{idx}",
@@ -533,10 +530,16 @@ def slice_coco(
                 out_ext=out_ext,
                 verbose=verbose,
             )
-            # append slice outputs
-            sliced_coco_images.extend(slice_image_result.coco_images)
-        except TopologicalError:
-            logger.warning(f"Invalid annotation found, skipping this image: {image_path}")
+            future_to_imgpath[future] = image_path
+
+        for future in concurrent.futures.as_completed(future_to_imgpath):
+            image_path = future_to_imgpath[future]
+            try:
+                slice_image_result = future.result()
+                pbar.update(1)
+                sliced_coco_images.extend(slice_image_result.coco_images)
+            except TopologicalError:
+                logger.warning(f"Invalid annotation found, skipping this image: {image_path}")
 
     # create and save coco dict
     coco_dict = create_coco_dict(
