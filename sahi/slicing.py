@@ -536,7 +536,7 @@ def slice_coco(
             image_path = future_to_imgpath[future]
             try:
                 slice_image_result = future.result()
-                pbar.update(1)
+                pbar.update()
                 sliced_coco_images.extend(slice_image_result.coco_images)
             except TopologicalError:
                 logger.warning(f"Invalid annotation found, skipping this image: {image_path}")
