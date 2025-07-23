@@ -3,11 +3,12 @@
 
 from typing import List, Optional, Union
 
+import shapely
 from shapely.geometry import CAP_STYLE, JOIN_STYLE, GeometryCollection, MultiPolygon, Polygon, box
 from shapely.validation import make_valid
 
 
-def get_shapely_box(x: int, y: int, width: int, height: int) -> Polygon:
+def get_shapely_box(x: int, y: int, width: int, height: int) -> tuple[int, int, int, int]:
     """
     Accepts coco style bbox coords and converts it to shapely box object
     """
@@ -15,7 +16,7 @@ def get_shapely_box(x: int, y: int, width: int, height: int) -> Polygon:
     miny = y
     maxx = x + width
     maxy = y + height
-    shapely_box = box(minx, miny, maxx, maxy)
+    shapely_box =  ((maxx, miny), (maxx, maxy), (minx, maxy), (minx, miny))
 
     return shapely_box
 
@@ -59,7 +60,11 @@ def get_bbox_from_shapely(shapely_object):
     """
     Accepts shapely box/poly object and returns its bounding box in coco and voc formats
     """
-    minx, miny, maxx, maxy = shapely_object.bounds
+    coords = shapely.get_coordinates(shapely_object)
+    if len(coords) == 5:
+        minx, miny, maxx, maxy = *coords.min(0), *coords.max(0)
+    else:
+        minx, miny, maxx, maxy = shapely_object.bounds
     width = maxx - minx
     height = maxy - miny
     coco_bbox = [minx, miny, width, height]
@@ -98,7 +103,7 @@ class ShapelyAnnotation:
             to calculate sliced coco coordinates.
         """
         shapely_polygon = get_shapely_box(x=bbox[0], y=bbox[1], width=bbox[2], height=bbox[3])
-        shapely_multipolygon = MultiPolygon([shapely_polygon])
+        shapely_multipolygon = MultiPolygon([(shapely_polygon,)])
         return cls(multipolygon=shapely_multipolygon, slice_bbox=slice_bbox)
 
     def __init__(self, multipolygon: MultiPolygon, slice_bbox=None):
@@ -216,7 +221,7 @@ class ShapelyAnnotation:
         """
         [xmin, ymin, width, height]
         """
-        if self.multipolygon.area != 0:
+        if self.multipolygon.is_valid and not self.multipolygon.is_empty:
             coco_bbox, _ = get_bbox_from_shapely(self.multipolygon)
             # fix coord by slice box
             if self.slice_bbox:
@@ -238,7 +243,7 @@ class ShapelyAnnotation:
         """
         [xmin, ymin, xmax, ymax]
         """
-        if self.multipolygon.area != 0:
+        if self.multipolygon.is_valid and not self.multipolygon.is_empty:
             _, voc_bbox = get_bbox_from_shapely(self.multipolygon)
             # fix coord by slice box
             if self.slice_bbox:
